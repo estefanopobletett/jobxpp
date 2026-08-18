@@ -25,3 +25,24 @@
 @media(max-width:1100px){.company-layout{grid-template-columns:190px minmax(0,1fr)}.company-stats-grid{grid-template-columns:repeat(2,1fr)}.company-content-grid,.company-bottom-grid{grid-template-columns:1fr}}
 @media(max-width:800px){.company-dashboard-top{align-items:flex-start;flex-direction:column}.company-layout{grid-template-columns:1fr}.company-sidebar{position:static}.company-side-nav{grid-template-columns:repeat(2,1fr)}.company-side-help{display:none}}
 @media(max-width:560px){.company-dashboard-top h1{font-size:1.75rem}.company-top-actions{width:100%}.company-top-actions>*{flex:1}.company-stats-grid{grid-template-columns:1fr 1fr}.company-stat{padding:12px}.company-stat-icon{width:34px;height:34px;flex-basis:34px}.company-stat-value{font-size:1.15rem}.company-stat-label{font-size:.64rem}.company-stat-extra{font-size:.58rem}.company-panel-card{padding:14px}.company-side-nav{grid-template-columns:1fr}.company-exp-title-row{align-items:flex-start;flex-direction:column}.company-exp-bottom{align-items:flex-start;flex-direction:column}.company-exp-actions{gap:12px}}
+
+/* Ajuste móvil: el perfil se mantiene a la derecha dentro del menú hamburguesa.
+   En escritorio conserva su posición original. */
+@media (max-width: 991.98px){
+  #mainNav #navAccount{
+    width:100%;
+    display:flex !important;
+    justify-content:flex-end !important;
+    align-items:center;
+    margin-top:8px;
+    padding:4px 0 2px;
+  }
+  #mainNav #navAccount .dropdown{
+    margin-left:auto;
+  }
+  #mainNav #navAccount .dropdown-menu{
+    right:0 !important;
+    left:auto !important;
+    max-width:calc(100vw - 32px);
+  }
+}
