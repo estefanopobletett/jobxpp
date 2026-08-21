@@ -40,3 +40,20 @@ El contenido funcional se basa en el documento del proyecto: público joven mayo
 - Perfil inclusivo ampliado: TDAH, TEA/espectro autista, Tourette, ansiedad social, movilidad reducida, discapacidad física, sordera/hipoacusia y baja visión/ceguera.
 - Campo libre para indicar otra condición, enfermedad o necesidad que no aparezca en la lista.
 - Las nuevas postulaciones y cambios de estado generan mensajes automáticos dentro de la conversación.
+
+
+## Reconstrucción JOBXP 2026
+
+Se reconstruyó la navegación de la aplicación manteniendo el diseño visual existente.
+La ruta `#/perfil` ahora es independiente y no evalúa referencias a funciones inexistentes
+al crear el mapa de rutas. También se agregó recuperación automática si el `localStorage`
+de la demo contiene JSON corrupto.
+
+Cambios principales:
+- Router seguro: las rutas se resuelven sin evaluar handlers inexistentes.
+- Perfil de joven funcional: edición y guardado real en `localStorage`.
+- Perfil de empresa funcional.
+- Panel de empresa y publicación de microexperiencias.
+- Rutas de postulaciones, mensajes, evaluaciones, inclusión y cómo funciona.
+- Recuperación de datos locales dañados sin dejar la aplicación en blanco.
+- Se conserva Bootstrap, Bootstrap Icons y la hoja de estilos original para mantener la apariencia.

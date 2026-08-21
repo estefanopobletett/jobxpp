@@ -972,7 +972,7 @@ const UI = {
                 <a href="javascript:history.back()" class="btn btn-primary mt-3 px-4">Regresar</a>
             </div>
         `;
-    }
+    },
      // 👇 NUEVO CÓDIGO
     renderAsistencia: function () {
         const appContent = document.querySelector("#app-content");
