@@ -78,6 +78,57 @@
         </div>
     `;
 
+    const getUsers = () => {
+        try { return StorageDB.get('jxp_users') || []; } catch (error) { return []; }
+    };
+
+    const getExperiences = () => {
+        try { return StorageDB.get('jxp_experiences') || []; } catch (error) { return []; }
+    };
+
+    const getCurrentUser = () => {
+        return StorageDB.get('jxp_current_user') || { id: 1, nombre: 'Camila R.', rol: 'joven' };
+    };
+
+    const uniqueCompanies = () => {
+        const experiences = getExperiences();
+        const names = [...new Set(experiences.map(exp => exp.empresa).filter(Boolean))];
+        return names.map((nombre, index) => ({ id: `empresa-${index + 1}`, nombre }));
+    };
+
+    const renderEvaluationTarget = (mode, currentUser) => {
+        const isYoung = mode === 'jovenEmpresa';
+        if (isYoung) {
+            const companies = uniqueCompanies();
+            return `
+                <div class="jxp-target-selector">
+                    <label for="evaluation-company">
+                        <i class="bi bi-building me-1"></i> Empresa a evaluar
+                    </label>
+                    <select id="evaluation-company" class="form-select" required>
+                        <option value="">Selecciona la empresa</option>
+                        ${companies.map(company => `<option value="${escapeHtml(company.nombre)}">${escapeHtml(company.nombre)}</option>`).join('')}
+                    </select>
+                    <small>Primero selecciona la empresa en la que realizaste la microexperiencia.</small>
+                </div>
+            `;
+        }
+
+        const youngUsers = getUsers().filter(user => user.rol === 'joven');
+        return `
+            <div class="jxp-target-selector">
+                <label for="evaluation-young">
+                    <i class="bi bi-person-check me-1"></i> Joven a evaluar
+                </label>
+                <select id="evaluation-young" class="form-select" required>
+                    <option value="">Selecciona el joven</option>
+                    ${youngUsers.map(user => `<option value="${user.id}">${escapeHtml(user.nombre)}${user.ubicacion ? ` · ${escapeHtml(user.ubicacion)}` : ''}</option>`).join('')}
+                </select>
+                <small>Como empresa, debes seleccionar al joven que realizó la experiencia antes de evaluarlo.</small>
+            </div>
+        `;
+    };
+
     const buildEvaluationForm = (mode) => {
         const isYoung = mode === 'jovenEmpresa';
         const list = isYoung ? criteria.jovenEmpresa : criteria.empresaJoven;
@@ -103,6 +154,8 @@
                             : 'Evalúa el desempeño según los objetivos definidos para la microexperiencia.'}
                     </p>
                 </div>
+
+                ${renderEvaluationTarget(mode, getCurrentUser())}
 
                 <div class="jxp-criteria-list">
                     ${list.map(item => renderCriterion(mode, item)).join('')}
@@ -149,11 +202,7 @@
     UI.renderEvaluaciones = function () {
         const content = document.getElementById('app-content');
 
-        const currentUser = StorageDB.get('jxp_current_user') || {
-            id: 1,
-            nombre: 'Camila R.',
-            rol: 'joven'
-        };
+        const currentUser = getCurrentUser();
 
         content.innerHTML = `
             <section class="jxp-evaluations-page">
@@ -433,6 +482,11 @@
 
                 const requiredCriteria = criteria[mode].map(item => item.key);
                 const complete = requiredCriteria.every(key => ratings[key]);
+                const companySelect = form.querySelector('#evaluation-company');
+                const youngSelect = form.querySelector('#evaluation-young');
+                const selectedCompany = companySelect ? companySelect.value : '';
+                const selectedYoungId = youngSelect ? youngSelect.value : '';
+                const selectedYoung = getUsers().find(user => String(user.id) === String(selectedYoungId));
 
                 const message = form.querySelector('.jxp-form-message');
 
@@ -447,12 +501,27 @@
 
                 const isYoung = mode === 'jovenEmpresa';
 
+                if ((isYoung && !selectedCompany) || (!isYoung && !selectedYoung)) {
+                    message.className = 'jxp-form-message error';
+                    message.innerHTML = `
+                        <i class="bi bi-exclamation-circle-fill"></i>
+                        ${isYoung ? 'Selecciona la empresa que quieres evaluar.' : 'Selecciona el joven que quieres evaluar.'}
+                    `;
+                    return;
+                }
+
+                const selectedExperience = getExperiences().find(exp =>
+                    isYoung ? exp.empresa === selectedCompany : true
+                );
+
                 const evaluation = {
                     id: Date.now(),
-                    experienciaId: 101,
-                    experiencia: 'Digitalización de documentos',
-                    empresa: 'Café Santiago',
-                    joven: currentUser.nombre || 'Camila R.',
+                    experienciaId: selectedExperience?.id || 101,
+                    experiencia: selectedExperience?.titulo || 'Microexperiencia',
+                    empresa: isYoung ? selectedCompany : (selectedExperience?.empresa || 'Empresa'),
+                    empresaId: currentUser.rol === 'empresa' ? currentUser.id : null,
+                    jovenId: isYoung ? currentUser.id : selectedYoung.id,
+                    joven: isYoung ? (currentUser.nombre || 'Joven') : selectedYoung.nombre,
                     emisor: isYoung ? 'joven' : 'empresa',
                     receptor: isYoung ? 'empresa' : 'joven',
                     tipo: mode,

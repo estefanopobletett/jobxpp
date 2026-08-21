@@ -434,14 +434,157 @@ function empresas(){
 
 function evaluaciones(){
   if(!requireLogin()) return;
-  const u=currentUser();
-  document.querySelector('#app').innerHTML=`<div class="row justify-content-center py-4"><div class="col-lg-9"><div class="cardx p-4 p-md-5"><span class="text-primary fw-bold small">CIERRE DE EXPERIENCIA</span><h1 class="section-title mt-2">Evaluaciones</h1><p class="text-muted">Registra una valoración simple y transparente de las experiencias realizadas.</p><div class="alert alert-light border"><i class="bi bi-shield-check text-success me-2"></i>Las evaluaciones se guardan localmente en este navegador.</div><form onsubmit="submitSimpleEvaluation(event)"><div class="mb-3"><label class="form-label fw-semibold">Calificación</label><select id="simpleRating" class="form-select" required><option value="">Selecciona</option><option value="5">★★★★★ · Excelente</option><option value="4">★★★★ · Muy buena</option><option value="3">★★★ · Buena</option><option value="2">★★ · Regular</option><option value="1">★ · Necesita mejorar</option></select></div><div class="mb-3"><label class="form-label fw-semibold">Comentario</label><textarea id="simpleComment" class="form-control" maxlength="500" rows="5" placeholder="Cuéntanos brevemente cómo fue."></textarea></div><button class="btn btn-primary" type="submit">Guardar evaluación</button></form></div></div></div>`;
+  const d=db(),u=currentUser();
+
+  // Los jóvenes deben elegir explícitamente la empresa y la experiencia que desean evaluar.
+  if(u.role==='joven'){
+    const companies=(d.companies||[]).filter(c=>
+      (d.jobs||[]).some(j=>j.companyId===c.id || j.company===c.name)
+    );
+
+    document.querySelector('#app').innerHTML=`
+      <section class="py-3">
+        <div class="profile-cover mb-4">
+          <span class="badge rounded-pill bg-white text-primary border px-3 py-2">CIERRE DE EXPERIENCIA</span>
+          <h1 class="fw-bold mt-3">Evalúa la empresa</h1>
+          <p class="mb-0 opacity-75">Elige la empresa y la experiencia realizada. Luego indica si las comodidades y condiciones prometidas realmente se cumplieron.</p>
+        </div>
+
+        <div class="row justify-content-center">
+          <div class="col-lg-9">
+            <div class="cardx p-4 p-md-5">
+              <div class="alert alert-light border d-flex gap-3 align-items-start">
+                <i class="bi bi-shield-check text-success fs-4"></i>
+                <div>
+                  <strong>Evaluación justa y protegida</strong>
+                  <div class="small text-muted mt-1">Evalúa únicamente lo que fue ofrecido y lo que ocurrió durante la experiencia. Las comodidades de accesibilidad son parte de la evaluación.</div>
+                </div>
+              </div>
+
+              <form id="companyEvaluationForm">
+                <div class="row g-3 mb-4">
+                  <div class="col-md-6">
+                    <label for="evaluationCompany" class="form-label fw-semibold">1. Selecciona la empresa</label>
+                    <select id="evaluationCompany" class="form-select" required>
+                      <option value="">Elige una empresa...</option>
+                      ${companies.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="evaluationJob" class="form-label fw-semibold">2. Selecciona la experiencia</label>
+                    <select id="evaluationJob" class="form-select" required disabled>
+                      <option value="">Primero elige una empresa...</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="promisedAmenities" class="mb-4"></div>
+
+                <div id="companyRatingBox" class="border rounded-4 p-4 mb-4 bg-light-subtle">
+                  <h5 class="fw-bold mb-3">3. ¿Cómo fue tu experiencia con la empresa?</h5>
+                  <label for="companyRating" class="form-label">Calificación general</label>
+                  <select id="companyRating" class="form-select" required>
+                    <option value="">Selecciona una calificación...</option>
+                    <option value="5">★★★★★ · Excelente</option>
+                    <option value="4">★★★★ · Muy buena</option>
+                    <option value="3">★★★ · Buena</option>
+                    <option value="2">★★ · Regular</option>
+                    <option value="1">★ · Necesita mejorar</option>
+                  </select>
+                </div>
+
+                <div class="mb-4">
+                  <label for="companyEvaluationComment" class="form-label fw-semibold">Comentario <span class="text-muted fw-normal">(opcional)</span></label>
+                  <textarea id="companyEvaluationComment" class="form-control" maxlength="500" rows="5" placeholder="Cuéntanos qué destacarías de la experiencia."></textarea>
+                  <div class="small text-muted text-end mt-1"><span id="companyCommentCount">0</span>/500</div>
+                </div>
+
+                <div id="companyEvaluationMessage" class="mb-3" role="status" aria-live="polite"></div>
+                <button class="btn btn-primary px-4" type="submit">
+                  <i class="bi bi-send me-2"></i>Guardar evaluación
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>`;
+
+    const companySelect=document.getElementById('evaluationCompany');
+    const jobSelect=document.getElementById('evaluationJob');
+    const amenitiesBox=document.getElementById('promisedAmenities');
+    const comment=document.getElementById('companyEvaluationComment');
+    const commentCount=document.getElementById('companyCommentCount');
+
+    function renderJobs(companyId){
+      const jobs=(d.jobs||[]).filter(j=>String(j.companyId)===String(companyId) || j.company===companies.find(c=>String(c.id)===String(companyId))?.name);
+      jobSelect.disabled=!companyId;
+      jobSelect.innerHTML=companyId
+        ? `<option value="">Elige la experiencia...</option>${jobs.map(j=>`<option value="${j.id}">${esc(j.title)} · ${esc(j.mode||'Modalidad no indicada')}</option>`).join('')}`
+        : '<option value="">Primero elige una empresa...</option>';
+      amenitiesBox.innerHTML='';
+    }
+
+    function renderAmenities(jobId){
+      const job=(d.jobs||[]).find(j=>Number(j.id)===Number(jobId));
+      if(!job){ amenitiesBox.innerHTML=''; return; }
+      const tags=[...(job.tags||[])];
+      const rows=tags.length ? tags.map((key,index)=>{
+        const label=TAGS[key]||key;
+        return `<div class="border rounded-3 p-3 mb-2 d-flex flex-column flex-md-row justify-content-between gap-3 align-items-md-center">
+          <div><strong>${esc(label)}</strong><div class="small text-muted">Comodidad/adaptación prometida en la experiencia.</div></div>
+          <div class="d-flex gap-3" role="radiogroup" aria-label="Cumplimiento de ${esc(label)}">
+            <label class="form-check"><input class="form-check-input amenity-status" type="radio" name="amenity_${index}" value="cumple" data-amenity="${esc(key)}" required> Sí cumplió</label>
+            <label class="form-check"><input class="form-check-input amenity-status" type="radio" name="amenity_${index}" value="no_cumple" data-amenity="${esc(key)}" required> No cumplió</label>
+          </div>
+        </div>`;
+      }).join('') : `<div class="alert alert-warning border-0"><i class="bi bi-info-circle me-2"></i>Esta experiencia no tiene comodidades de accesibilidad registradas. Igual puedes evaluar la empresa y dejar un comentario.</div>`;
+      amenitiesBox.innerHTML=`<div class="mb-3"><h5 class="fw-bold mb-1">3. ¿Cumplió las comodidades prometidas?</h5><p class="text-muted small mb-3">Marca <strong>Sí cumplió</strong> o <strong>No cumplió</strong> para cada comodidad publicada.</p>${rows}</div>`;
+      document.getElementById('companyRatingBox').querySelector('h5').textContent=tags.length?'4. ¿Cómo fue tu experiencia con la empresa?':'3. ¿Cómo fue tu experiencia con la empresa?';
+    }
+
+    companySelect.addEventListener('change',()=>renderJobs(companySelect.value));
+    jobSelect.addEventListener('change',()=>renderAmenities(jobSelect.value));
+    comment.addEventListener('input',()=>commentCount.textContent=comment.value.length);
+
+    document.getElementById('companyEvaluationForm').addEventListener('submit',e=>{
+      e.preventDefault();
+      const companyId=Number(companySelect.value),jobId=Number(jobSelect.value),rating=Number(document.getElementById('companyRating').value);
+      const job=(d.jobs||[]).find(j=>Number(j.id)===jobId);
+      const company=(d.companies||[]).find(c=>Number(c.id)===companyId);
+      if(!company || !job){showEvaluationMessage('Selecciona la empresa y la experiencia antes de continuar.','danger');return;}
+      const statuses={};
+      document.querySelectorAll('.amenity-status:checked').forEach(input=>statuses[input.dataset.amenity]=input.value);
+      const promised=(job.tags||[]);
+      if(promised.some(k=>!statuses[k])){showEvaluationMessage('Indica si se cumplió cada comodidad prometida antes de enviar.','warning');return;}
+      if(!rating){showEvaluationMessage('Selecciona una calificación general.','warning');return;}
+
+      d.ratings.push({
+        id:Date.now(), userId:u.id, role:'joven', type:'empresa',
+        companyId:company.id, company:company.name, jobId:job.id, jobTitle:job.title,
+        rating, comment:comment.value.trim(),
+        promisedAmenities:promised,
+        amenityCompliance:statuses,
+        date:new Date().toISOString()
+      });
+      saveDB(d);
+      showEvaluationMessage(`Evaluación de ${esc(company.name)} guardada correctamente. Gracias por indicar también si cumplió las comodidades prometidas.`,'success');
+      e.target.querySelector('button[type="submit"]').disabled=true;
+    });
+
+    function showEvaluationMessage(text,type){
+      document.getElementById('companyEvaluationMessage').innerHTML=`<div class="alert alert-${type} border-0">${text}</div>`;
+    }
+    return;
+  }
+
+  // Vista para empresas: mantienen la evaluación simple de jóvenes.
+  document.querySelector('#app').innerHTML=`<div class="row justify-content-center py-4"><div class="col-lg-9"><div class="cardx p-4 p-md-5"><span class="text-primary fw-bold small">CIERRE DE EXPERIENCIA</span><h1 class="section-title mt-2">Evaluar joven</h1><p class="text-muted">Registra una valoración transparente del desempeño durante la experiencia.</p><form onsubmit="submitSimpleEvaluation(event)"><div class="mb-3"><label class="form-label fw-semibold">Calificación</label><select id="simpleRating" class="form-select" required><option value="">Selecciona</option><option value="5">★★★★★ · Excelente</option><option value="4">★★★★ · Muy buena</option><option value="3">★★★ · Buena</option><option value="2">★★ · Regular</option><option value="1">★ · Necesita mejorar</option></select></div><div class="mb-3"><label class="form-label fw-semibold">Comentario</label><textarea id="simpleComment" class="form-control" maxlength="500" rows="5" placeholder="¿Cómo fue el desempeño del joven?"></textarea></div><button class="btn btn-primary" type="submit">Guardar evaluación</button></form></div></div></div>`;
 }
 
 function submitSimpleEvaluation(e){
   e.preventDefault();
   const d=db(),u=currentUser();
-  d.ratings.push({id:Date.now(),userId:u.id,rating:Number(document.getElementById('simpleRating').value),comment:document.getElementById('simpleComment').value.trim(),date:new Date().toISOString()});
+  d.ratings.push({id:Date.now(),userId:u.id,role:u.role,type:'joven',rating:Number(document.getElementById('simpleRating').value),comment:document.getElementById('simpleComment').value.trim(),date:new Date().toISOString()});
   saveDB(d); toast('Evaluación guardada correctamente');
   location.hash='#/inicio';
 }
